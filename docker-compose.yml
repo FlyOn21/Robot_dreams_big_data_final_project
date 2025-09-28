@@ -1,0 +1,174 @@
+version: "3.8"
+services:
+  postgres_airflow:
+    image: postgres:16
+    container_name: postgres_airflow_hw_20
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes: [pg_af_data:/var/lib/postgresql/data]
+    ports:
+      - "15432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [airflow_network]
+
+  postgres_db_dbt_hw_20:
+    image: postgres:16
+    container_name: postgres_db_dbt_hw_20
+    hostname: dbt_hw_20_host
+    ports:
+      - "15433:5432"
+    environment:
+      POSTGRES_USER: dbt_user
+      POSTGRES_PASSWORD: "12345678"
+      POSTGRES_DB: dbt_hw_20
+    volumes: [pg_dbt_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dbt_user -d dbt_hw_20"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks: [airflow_network]
+
+  airflow-init:
+    build: .
+    container_name: airflow_init_hw_20
+    depends_on:
+      postgres_airflow: {condition: service_healthy}
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__FERNET_KEY: "${AIRFLOW__CORE__FERNET_KEY}"
+      AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX: "true"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow:5432/airflow
+      AIRFLOW_HOME: /opt/airflow
+      TZ: Europe/Kyiv
+      AIRFLOW__LOGGING__REMOTE_LOGGING: "false"
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+    user: "${AIRFLOW_UID:-50000}:0"
+    command: >
+      bash -lc 'airflow db upgrade && airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true'
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+    networks: [airflow_network]
+
+  scheduler:
+    build: .
+    container_name: airflow_scheduler_hw_20
+    depends_on:
+      postgres_airflow: {condition: service_healthy}
+      airflow-init: {condition: service_completed_successfully}
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__FERNET_KEY: "${AIRFLOW__CORE__FERNET_KEY}"
+      AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX: "true"
+      AIRFLOW__WEBSERVER__AUTHENTICATE_LOGS: "false"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow:5432/airflow
+      AIRFLOW_HOME: /opt/airflow
+      TZ: Europe/Kyiv
+      AIRFLOW__LOGGING__REMOTE_LOGGING: "false"
+      AIRFLOW__LOGGING__LOGGING_LEVEL: "INFO"
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+      AIRFLOW__WEBSERVER__EXPOSE_HOSTNAME: "true"
+      AIRFLOW__WEBSERVER__EXPOSE_STACKTRACE: "true"
+    user: "${AIRFLOW_UID:-50000}:0"
+    command: ["airflow", "scheduler"]
+    restart: always
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./dbt_profiles:/home/airflow/.dbt
+      - ./dbt_nyt/nyt_dbt_airflow:/dbt_nyt/nyt_dbt_airflow
+    networks: [airflow_network]
+
+  webserver:
+    build: .
+    container_name: airflow_webserver_hw_20
+    depends_on:
+      scheduler: {condition: service_started}
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__FERNET_KEY: "${AIRFLOW__CORE__FERNET_KEY}"
+      AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX: "true"
+      AIRFLOW__WEBSERVER__AUTHENTICATE_LOGS: "false"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow:5432/airflow
+      AIRFLOW_HOME: /opt/airflow
+      TZ: Europe/Kyiv
+      AIRFLOW__LOGGING__REMOTE_LOGGING: "false"
+      AIRFLOW__LOGGING__LOGGING_LEVEL: "INFO"
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+      AIRFLOW__WEBSERVER__EXPOSE_HOSTNAME: "true"
+      AIRFLOW__WEBSERVER__EXPOSE_STACKTRACE: "true"
+      AIRFLOW__WEBSERVER__LOG_FETCH_TIMEOUT_SEC: "10"
+      AIRFLOW__WEBSERVER__LOG_AUTO_TAILING_OFFSET: "30"
+      AIRFLOW__WEBSERVER__LOG_ANIMATION_SPEED: "1000"
+    user: "${AIRFLOW_UID:-50000}:0"
+    command: ["airflow", "webserver"]
+    ports: ["8080:8080"]
+    restart: always
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./dbt_profiles:/home/airflow/.dbt
+      - ./dbt_nyt/nyt_dbt_airflow:/dbt_nyt/nyt_dbt_airflow
+    networks: [airflow_network]
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.8.0
+    container_name: zookeeper
+    networks: [airflow_network]
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+  kafka:
+    image: confluentinc/cp-kafka:7.8.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9094:9092"
+    networks: [airflow_network]
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9094
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+  kafka-schema-registry:
+    image: confluentinc/cp-schema-registry:7.8.0
+    hostname: kafka-schema-registry
+    container_name: kafka-schema-registry
+    depends_on:
+      - kafka
+    networks: [airflow_network]
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: kafka-schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'kafka:9092'
+      SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: 'zookeeper:2181'
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+
+
+networks:
+  dbt_network:
+    name: dbt_network
+
+volumes:
+  pg_af_data:
+  pg_dbt_data:
