@@ -1,0 +1,73 @@
+
+# Name your project! Project names should contain only lowercase characters
+# and underscores. A good package name should reflect your organization's
+# name or the intended use of these models
+name: 'fp_big_data'
+version: '1.0.0'
+
+# This setting configures which "profile" dbt uses for this project.
+profile: 'fp_big_data'
+
+# These configurations specify where dbt should look for different types of files.
+# The `model-paths` config, for example, states that models in this project can be
+# found in the "models/" directory. You probably won't need to change these!
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:         # directories to be removed by `dbt clean`
+  - "target"
+  - "dbt_packages"
+
+
+# Configuring models
+# Full documentation: https://docs.getdbt.com/docs/configuring-models
+
+# In this example config, we tell dbt to build all models in the example/
+# directory as views. These settings can be overridden in the individual model
+# files using the `{{ config(...) }}` macro.
+
+
+models:
+  fp_big_data:
+    +post-hook:
+      - "ANALYZE {{ this }}"
+    +materialized: view
+    +on_schema_change: "append_new_columns"
+
+    staging:
+      +materialized: table
+      +schema: staging
+      +tags: ["staging"]
+
+      stg_ucr_codes:
+        +materialized: table
+        +tags: ["reference", "staging"]
+
+      stg_crimes:
+        +materialized: incremental
+        +unique_key: crime_id
+        +on_schema_change: "append_new_columns"
+        +tags: ["crimes", "staging", "incremental"]
+
+      stg_arrests:
+        +materialized: incremental
+        +unique_key: arrest_id
+        +on_schema_change: "append_new_columns"
+        +tags: ["arrests", "staging", "incremental"]
+
+vars:
+  start_date: '2001-01-01'
+  end_date: '2030-12-31'
+
+  # Testing
+  dev_mode: false
+  dev_limit: 10000
+
+dispatch:
+  - macro_namespace: dbt_utils
+    search_order: ['dbt_utils']
+

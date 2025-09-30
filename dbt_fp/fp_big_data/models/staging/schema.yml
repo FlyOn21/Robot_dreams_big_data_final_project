@@ -1,0 +1,309 @@
+version: 2
+
+models:
+  - name: stg_ucr_codes
+    description: "Staging table for UCR (Uniform Crime Reporting) codes with standardized crime classifications"
+    columns:
+      - name: iucr_code
+        description: "Illinois Uniform Crime Reporting code (Primary Key)"
+        tests:
+          - unique
+          - not_null
+
+      - name: primary_description
+        description: "Primary classification of crime type"
+        tests:
+          - not_null
+
+      - name: secondary_description
+        description: "Secondary/detailed classification"
+        tests:
+          - not_null
+
+      - name: index_code
+        description: "FBI Index Crime indicator (I = Index Crime)"
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['I', 'N', 'Unknown']
+
+      - name: is_active
+        description: "Whether this UCR code is currently in use"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
+
+      - name: is_index_crime
+        description: "Boolean flag for FBI Index Crimes (serious crimes tracked nationally)"
+        tests:
+          - not_null
+
+      - name: crime_category
+        description: "High-level crime category (Violent Crime, Property Crime, Other Crime)"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Violent Crime', 'Property Crime', 'Other Crime']
+
+  - name: stg_crimes
+    description: "Staging table for crime incidents with temporal enrichment and UCR code joins"
+    tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "crime_datetime <= CURRENT_TIMESTAMP"
+          config:
+            severity: error
+    columns:
+      - name: crime_id
+        description: "Unique identifier for each crime (Primary Key)"
+        tests:
+          - unique
+          - not_null
+
+      - name: case_number
+        description: "Chicago Police Department case number"
+        tests:
+          - not_null
+
+      - name: crime_datetime
+        description: "Date and time of crime occurrence"
+        tests:
+          - not_null
+          - test_valid_timestamp_range:
+              arguments:
+                start_year: 2001
+
+      - name: crime_date
+        description: "Date of crime (without time component)"
+        tests:
+          - not_null
+          - test_future_date
+
+      - name: crime_hour
+        description: "Hour of day when crime occurred (0-23)"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 23
+
+      - name: crime_day_of_week
+        description: "Name of day when crime occurred"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+      - name: crime_month
+        description: "Month when crime occurred (1-12)"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 12
+
+      - name: crime_year
+        description: "Year when crime occurred"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 2001
+                max_value: 2030
+
+      - name: iucr_code
+        description: "Illinois Uniform Crime Reporting code"
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_ucr_codes')
+                field: iucr_code
+
+      - name: primary_type
+        description: "Primary crime type classification"
+        tests:
+          - not_null
+
+      - name: latitude
+        description: "Latitude coordinate of crime location"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 41.6
+                max_value: 42.1
+                inclusive: true
+
+      - name: longitude
+        description: "Longitude coordinate of crime location"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: -88.0
+                max_value: -87.5
+                inclusive: true
+
+      - name: is_arrest
+        description: "Whether an arrest was made"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
+
+      - name: is_domestic
+        description: "Whether crime was domestic-related"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
+
+      - name: time_of_day
+        description: "Categorized time period (Morning, Afternoon, Evening, Night)"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Morning', 'Afternoon', 'Evening', 'Night']
+
+      - name: is_weekend
+        description: "Whether crime occurred on weekend (Saturday/Sunday)"
+        tests:
+          - not_null
+
+      - name: location_type
+        description: "Categorized location type"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Residential', 'Street', 'Commercial', 'Educational', 'Parking', 'Other']
+
+      - name: crime_category
+        description: "High-level crime category from UCR codes"
+        tests:
+          - not_null
+
+  - name: stg_arrests
+    description: "Staging table for arrest records with charge information and temporal enrichment"
+    tests:
+      - test_charge_consistency
+      - test_no_orphan_arrests
+    columns:
+      - name: arrest_id
+        description: "Unique identifier for each arrest (Primary Key)"
+        tests:
+          - unique
+          - not_null
+
+      - name: case_number
+        description: "Chicago Police Department case number"
+        tests:
+          - not_null
+          - test_referential_integrity_with_nulls:
+              arguments:
+                to: ref('stg_crimes')
+                field: case_number
+              config:
+                severity: warn
+
+      - name: arrest_date
+        description: "Date of arrest"
+        tests:
+          - not_null
+          - test_future_date
+
+      - name: arrest_month
+        description: "Month when arrest occurred (1-12)"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 12
+
+      - name: arrest_year
+        description: "Year when arrest occurred"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 2001
+                max_value: 2030
+
+      - name: arrest_day_of_week
+        description: "Name of day when arrest occurred"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+      - name: arrestee_race
+        description: "Race of arrestee"
+        tests:
+          - not_null
+
+      - name: charge_one_statute
+        description: "Statute code for primary charge"
+        tests:
+          - not_null
+
+      - name: charge_one_description
+        description: "Description of primary charge"
+        tests:
+          - not_null
+
+      - name: charge_one_type
+        description: "Type of primary charge (Felony, Misdemeanor, Other)"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Felony', 'Misdemeanor', 'Other', 'Unknown']
+
+      - name: charge_one_class
+        description: "Class of primary charge"
+        tests:
+          - not_null
+
+      - name: charge_count
+        description: "Total number of charges (1-4)"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 4
+
+      - name: is_weekend_arrest
+        description: "Whether arrest occurred on weekend"
+        tests:
+          - not_null
+
+      - name: is_felony_charge
+        description: "Whether primary charge is a felony"
+        tests:
+          - not_null
+
+      - name: has_multiple_charges
+        description: "Whether arrestee has more than one charge"
+        tests:
+          - not_null
+
+      - name: arrestee_race_group
+        description: "Grouped race category for analysis"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['WHITE', 'BLACK', 'WHITE HISPANIC', 'BLACK HISPANIC', 'Other', 'Unknown']

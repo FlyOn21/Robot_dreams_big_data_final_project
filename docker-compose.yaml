@@ -1,0 +1,269 @@
+version: "3.8"
+services:
+  postgres_airflow:
+    image: postgres:16
+    container_name: postgres_airflow_hw_fp
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes: [pg_af_data:/var/lib/postgresql/data]
+    ports:
+      - "15432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [airflow_network]
+
+  postgres_db_dbt_hw_fp:
+    image: postgres:16
+    container_name: postgres_db_dbt_fp
+    hostname: dbt_hw_fp_host
+    ports:
+      - "15433:5432"
+    environment:
+      POSTGRES_USER: dbt_user
+      POSTGRES_PASSWORD: "12345678"
+      POSTGRES_DB: dbt_hw_fp
+    volumes: [pg_dbt_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dbt_user -d dbt_hw_fp"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks: [airflow_network]
+
+  airflow-init:
+    build:
+      context: .
+      dockerfile: DockerfileAirflow
+    container_name: airflow_init_hw_fp
+    depends_on:
+      postgres_airflow: {condition: service_healthy}
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__FERNET_KEY: "${AIRFLOW__CORE__FERNET_KEY}"
+      AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX: "true"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow:5432/airflow
+      AIRFLOW_HOME: /opt/airflow
+      TZ: Europe/Kyiv
+      AIRFLOW__LOGGING__REMOTE_LOGGING: "false"
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+    user: "${AIRFLOW_UID:-50000}:0"
+    command: >
+      bash -lc 'airflow db upgrade && airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true'
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+    networks: [airflow_network]
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: DockerfileAirflow
+    container_name: airflow_scheduler_hw_fp
+    depends_on:
+      postgres_airflow: {condition: service_healthy}
+      airflow-init: {condition: service_completed_successfully}
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__FERNET_KEY: "${AIRFLOW__CORE__FERNET_KEY}"
+      AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX: "true"
+      AIRFLOW__WEBSERVER__AUTHENTICATE_LOGS: "false"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow:5432/airflow
+      AIRFLOW_HOME: /opt/airflow
+      TZ: Europe/Kyiv
+      AIRFLOW__LOGGING__REMOTE_LOGGING: "false"
+      AIRFLOW__LOGGING__LOGGING_LEVEL: "INFO"
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+      AIRFLOW__WEBSERVER__EXPOSE_HOSTNAME: "true"
+      AIRFLOW__WEBSERVER__EXPOSE_STACKTRACE: "true"
+    user: "${AIRFLOW_UID:-50000}:0"
+    command: ["airflow", "scheduler"]
+    restart: always
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./dbt_profiles:/home/airflow/.dbt
+      - ./dbt_fp:/dbt_fp
+      - ./spark:/spark
+      - ./source_data:/source_data
+    networks: [airflow_network]
+
+  webserver:
+    build:
+      context: .
+      dockerfile: DockerfileAirflow
+    container_name: airflow_webserver_hw_fp
+    depends_on:
+      scheduler: {condition: service_started}
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__FERNET_KEY: "${AIRFLOW__CORE__FERNET_KEY}"
+      AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX: "true"
+      AIRFLOW__WEBSERVER__AUTHENTICATE_LOGS: "false"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow:5432/airflow
+      AIRFLOW_HOME: /opt/airflow
+      TZ: Europe/Kyiv
+      AIRFLOW__LOGGING__REMOTE_LOGGING: "false"
+      AIRFLOW__LOGGING__LOGGING_LEVEL: "INFO"
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+      AIRFLOW__WEBSERVER__EXPOSE_HOSTNAME: "true"
+      AIRFLOW__WEBSERVER__EXPOSE_STACKTRACE: "true"
+      AIRFLOW__WEBSERVER__LOG_FETCH_TIMEOUT_SEC: "10"
+      AIRFLOW__WEBSERVER__LOG_AUTO_TAILING_OFFSET: "30"
+      AIRFLOW__WEBSERVER__LOG_ANIMATION_SPEED: "1000"
+    user: "${AIRFLOW_UID:-50000}:0"
+    command: ["airflow", "webserver"]
+    ports: ["8080:8080"]
+    restart: always
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./dbt_profiles:/home/airflow/.dbt
+      - ./dbt_fp:/dbt_fp
+      - ./spark:/spark
+      - ./source_data:/source_data
+    networks: [airflow_network]
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper
+    hostname: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-logs:/var/lib/zookeeper/log
+    networks: [airflow_network]
+    restart: unless-stopped
+
+  kafka1:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka1
+    hostname: kafka1
+    ports:
+      - "9092:9092"
+      - "9997:9997"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka1:29092,PLAINTEXT_HOST://127.0.0.1:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_DELETE_TOPIC_ENABLE: "true"
+      KAFKA_JMX_PORT: 9997
+      KAFKA_JMX_HOSTNAME: 127.0.0.1
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks: [airflow_network]
+    depends_on:
+      - zookeeper
+    healthcheck:
+      test: [ "CMD", "kafka-topics", "--bootstrap-server", "127.0.0.1:9092", "--list" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.4.0
+    container_name: schema-registry
+    hostname: schema-registry
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka1:29092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    networks: [airflow_network]
+    depends_on:
+      kafka1:
+        condition: service_healthy
+    restart: unless-stopped
+
+  kafka-connect:
+    image: confluentinc/cp-kafka-connect:7.4.0
+    container_name: kafka-connect
+    hostname: kafka-connect
+    ports:
+      - "8083:8083"
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: kafka1:29092
+      CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect
+      CONNECT_REST_PORT: 8083
+      CONNECT_GROUP_ID: compose-connect-group
+      CONNECT_CONFIG_STORAGE_TOPIC: docker-connect-configs
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_FLUSH_INTERVAL_MS: 10000
+      CONNECT_OFFSET_STORAGE_TOPIC: docker-connect-offsets
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_TOPIC: docker-connect-status
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
+      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_INTERNAL_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
+    networks: [airflow_network]
+    depends_on:
+      kafka1:
+        condition: service_healthy
+    restart: unless-stopped
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "14000:8080"
+    environment:
+      DYNAMIC_CONFIG_ENABLED: "true"
+      KAFKA_CLUSTERS_0_NAME: local_cluster_kafka
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka1:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: connect
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://kafka-connect:8083
+      KAFKA_CLUSTERS_0_AUDIT_TOPICAUDITENABLED: "true"
+      KAFKA_CLUSTERS_0_AUDIT_CONSOLEAUDITENABLED: "true"
+    networks: [airflow_network]
+    depends_on:
+      kafka1:
+        condition: service_healthy
+    restart: unless-stopped
+
+
+networks:
+  airflow_network:
+    name: airflow_network
+
+volumes:
+  pg_af_data:
+    driver: local
+  pg_dbt_data:
+    driver: local
+  kafka-data:
+    driver: local
+  zookeeper-data:
+    driver: local
+  zookeeper-logs:
+    driver: local
