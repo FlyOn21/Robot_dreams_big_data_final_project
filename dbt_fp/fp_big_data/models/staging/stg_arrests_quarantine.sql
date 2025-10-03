@@ -1,34 +1,27 @@
 {{
     config(
-        materialized='incremental',
-        unique_key='arrest_id',
-        on_schema_change='append_new_columns',
-        schema='staging',
-        post_hook=[
-            "CREATE INDEX IF NOT EXISTS idx_arrests_case_number ON {{ this }} (case_number)"
-        ]
+        materialized='table',
+        schema='staging'
     )
 }}
 
-WITH source AS (
+-- Arrests БЕЗ соответствующих crimes для дальнейшего анализа
+WITH source_arrests AS (
     SELECT * FROM {{ source('silver', 'silver_arrests') }}
-
-    {% if is_incremental() %}
-        WHERE load_timestamp > (SELECT MAX(load_timestamp) FROM {{ this }})
-    {% endif %}
 ),
 
-valid_case_numbers AS (
+source_crimes AS (
     SELECT DISTINCT case_number
-    FROM {{ ref('stg_crimes') }}
+    FROM {{ source('silver', 'silver_crimes') }}
     WHERE case_number IS NOT NULL
 ),
 
-filtered_source AS (
-    SELECT s.*
-    FROM source s
-    INNER JOIN valid_case_numbers v
-        ON s.case_number = v.case_number
+orphan_arrests AS (
+    SELECT a.*
+    FROM source_arrests a
+    LEFT JOIN source_crimes c
+        ON a.case_number = c.case_number
+    WHERE c.case_number IS NULL
 ),
 
 renamed AS (
@@ -78,7 +71,7 @@ renamed AS (
         load_timestamp,
         source_file
 
-    FROM filtered_source
+    FROM orphan_arrests
 ),
 
 enriched AS (
@@ -110,7 +103,11 @@ enriched AS (
             WHEN r.arrestee_race = 'Unknown'
             THEN 'Unknown'
             ELSE 'Other'
-        END AS arrestee_race_group
+        END AS arrestee_race_group,
+
+        -- Quarantine metadata
+        'Missing crime record' AS quarantine_reason,
+        CURRENT_TIMESTAMP AS quarantined_at
 
     FROM renamed r
 )

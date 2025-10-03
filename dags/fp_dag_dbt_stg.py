@@ -54,13 +54,44 @@ with DAG(
             dbt deps --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
             """
     )
-    dbt_run_stg = BashOperator(
-        task_id='dbt_run_stg',
+
+    dbt_run_ucr_codes = BashOperator(
+        task_id='dbt_run_ucr_codes',
         bash_command=r"""
             set -e
             cd /dbt_fp/fp_big_data
-            echo "Running dbt models..."
-            dbt run --full-refresh --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
+            echo "Running stg_ucr_codes..."
+            dbt run --select stg_ucr_codes --full-refresh --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
+            """
+    )
+
+    dbt_run_crimes = BashOperator(
+        task_id='dbt_run_crimes',
+        bash_command=r"""
+            set -e
+            cd /dbt_fp/fp_big_data
+            echo "Running stg_crimes..."
+            dbt run --select stg_crimes --full-refresh --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
+            """
+    )
+
+    dbt_run_arrests = BashOperator(
+        task_id='dbt_run_arrests',
+        bash_command=r"""
+            set -e
+            cd /dbt_fp/fp_big_data
+            echo "Running stg_arrests..."
+            dbt run --select stg_arrests --full-refresh --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
+            """
+    )
+
+    dbt_run_arrests_quarantine = BashOperator(
+        task_id='dbt_run_arrests_quarantine',
+        bash_command=r"""
+            set -e
+            cd /dbt_fp/fp_big_data
+            echo "Running stg_arrests_quarantine..."
+            dbt run --select stg_arrests_quarantine --full-refresh --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
             """
     )
 
@@ -80,5 +111,5 @@ with DAG(
     )
 
 
-    check_connect_data_task_dbt >> dbt_deps_stg >> dbt_run_stg >> dbt_test_stg >> end_dbt_stg
+    check_connect_data_task_dbt >> dbt_deps_stg >> dbt_run_ucr_codes >> dbt_run_crimes >> [dbt_run_arrests, dbt_run_arrests_quarantine] >> dbt_test_stg >> end_dbt_stg
 

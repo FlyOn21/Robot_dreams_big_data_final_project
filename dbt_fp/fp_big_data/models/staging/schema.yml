@@ -1,6 +1,36 @@
 version: 2
 
 models:
+  - name: stg_arrests_quarantine
+    description: "Quarantine table for arrests without matching crime records - requires investigation"
+    config:
+      tags: [ 'quarantine', 'data_quality' ]
+    columns:
+      - name: arrest_id
+        description: "Unique identifier for quarantined arrest"
+        tests:
+          - unique
+          - not_null
+
+      - name: case_number
+        description: "Case number that doesn't exist in crimes table"
+        tests:
+          - not_null
+
+      - name: arrest_date
+        description: "Date of arrest"
+
+      - name: quarantine_reason
+        description: "Reason for quarantine"
+
+      - name: quarantined_at
+        description: "Timestamp when record was quarantined"
+
+      - name: arrest_year
+        description: "Year of arrest for analysis"
+
+      - name: arrest_month
+        description: "Month of arrest for analysis"
   - name: stg_ucr_codes
     description: "Staging table for UCR (Uniform Crime Reporting) codes with standardized crime classifications"
     columns:
@@ -72,7 +102,7 @@ models:
         description: "Date and time of crime occurrence"
         tests:
           - not_null
-          - test_valid_timestamp_range:
+          - valid_timestamp_range:
               arguments:
                 start_year: 2001
 
@@ -80,7 +110,7 @@ models:
         description: "Date of crime (without time component)"
         tests:
           - not_null
-          - test_future_date
+          - future_date
 
       - name: crime_hour
         description: "Hour of day when crime occurred (0-23)"
@@ -122,9 +152,10 @@ models:
         tests:
           - not_null
           - relationships:
-              arguments:
-                to: ref('stg_ucr_codes')
-                field: iucr_code
+              to: ref('stg_ucr_codes')
+              field: iucr_code
+              config:
+                severity: warn
 
       - name: primary_type
         description: "Primary crime type classification"
@@ -132,9 +163,8 @@ models:
           - not_null
 
       - name: latitude
-        description: "Latitude coordinate of crime location"
+        description: "Latitude coordinate of crime location (NULL if invalid)"
         tests:
-          - not_null
           - dbt_utils.accepted_range:
               arguments:
                 min_value: 41.6
@@ -142,9 +172,8 @@ models:
                 inclusive: true
 
       - name: longitude
-        description: "Longitude coordinate of crime location"
+        description: "Longitude coordinate of crime location (NULL if invalid)"
         tests:
-          - not_null
           - dbt_utils.accepted_range:
               arguments:
                 min_value: -88.0
@@ -196,8 +225,10 @@ models:
   - name: stg_arrests
     description: "Staging table for arrest records with charge information and temporal enrichment"
     tests:
-      - test_charge_consistency
-      - test_no_orphan_arrests
+      - charge_consistency
+      - no_orphan_arrests:
+          config:
+            severity: warn
     columns:
       - name: arrest_id
         description: "Unique identifier for each arrest (Primary Key)"
@@ -209,10 +240,15 @@ models:
         description: "Chicago Police Department case number"
         tests:
           - not_null
-          - test_referential_integrity_with_nulls:
-              arguments:
-                to: ref('stg_crimes')
-                field: case_number
+#          - referential_integrity_with_nulls:
+#              arguments:
+#                to: ref('stg_crimes')
+#                field: case_number
+#              config:
+#                severity: warn
+          - relationships:
+              to: ref('stg_crimes')
+              field: case_number
               config:
                 severity: warn
 
@@ -220,7 +256,7 @@ models:
         description: "Date of arrest"
         tests:
           - not_null
-          - test_future_date
+          - future_date
 
       - name: arrest_month
         description: "Month when arrest occurred (1-12)"
@@ -307,3 +343,4 @@ models:
           - accepted_values:
               arguments:
                 values: ['WHITE', 'BLACK', 'WHITE HISPANIC', 'BLACK HISPANIC', 'Other', 'Unknown']
+

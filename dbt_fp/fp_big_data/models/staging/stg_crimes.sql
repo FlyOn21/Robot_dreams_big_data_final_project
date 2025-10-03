@@ -3,7 +3,11 @@
         materialized='incremental',
         unique_key='crime_id',
         on_schema_change='append_new_columns',
-        schema='staging'
+        schema='staging',
+        post_hook=[
+        "CREATE INDEX IF NOT EXISTS idx_crimes_case_number ON {{ this }} (case_number)",
+        "CREATE INDEX IF NOT EXISTS idx_crimes_iucr_code ON {{ this }} (iucr_code)"
+    ]
     )
 }}
 
@@ -20,7 +24,6 @@ renamed AS (
         crime_id,
 
         case_number,
-        -- FIX: Normalize IUCR code for matching with reference table
         TRIM(UPPER(iucr_code)) AS iucr_code,
         fbi_code,
 

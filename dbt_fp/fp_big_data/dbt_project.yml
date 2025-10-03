@@ -33,8 +33,8 @@ clean-targets:         # directories to be removed by `dbt clean`
 
 models:
   fp_big_data:
-    +post-hook:
-      - "ANALYZE {{ this }}"
+#    +post-hook:
+#      - "ANALYZE {{ this }}"
     +materialized: view
     +on_schema_change: "append_new_columns"
 
@@ -49,13 +49,11 @@ models:
 
       stg_crimes:
         +materialized: incremental
-        +unique_key: crime_id
         +on_schema_change: "append_new_columns"
         +tags: ["crimes", "staging", "incremental"]
 
       stg_arrests:
         +materialized: incremental
-        +unique_key: arrest_id
         +on_schema_change: "append_new_columns"
         +tags: ["arrests", "staging", "incremental"]
 
@@ -63,11 +61,8 @@ vars:
   start_date: '2001-01-01'
   end_date: '2030-12-31'
 
-  # Testing
-  dev_mode: false
-  dev_limit: 10000
+#  # Testing
+#  dev_mode: false
+#  dev_limit: 10000
 
-dispatch:
-  - macro_namespace: dbt_utils
-    search_order: ['dbt_utils']
 

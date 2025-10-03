@@ -1,7 +1,5 @@
 {% macro test_no_orphan_arrests(model) %}
 
--- This checks if case_number in arrests exists in crimes
-
 WITH arrests AS (
     SELECT DISTINCT case_number
     FROM {{ model }}
@@ -11,14 +9,13 @@ WITH arrests AS (
 crimes AS (
     SELECT DISTINCT case_number
     FROM {{ ref('stg_crimes') }}
-),
-
-orphan_arrests AS (
-    SELECT case_number
-    FROM arrests
-    WHERE case_number NOT IN (SELECT case_number FROM crimes)
+    WHERE case_number IS NOT NULL
 )
 
-SELECT * FROM orphan_arrests
+SELECT a.case_number
+FROM arrests a
+LEFT JOIN crimes c
+    ON a.case_number = c.case_number
+WHERE c.case_number IS NULL
 
 {% endmacro %}
