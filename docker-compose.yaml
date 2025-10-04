@@ -94,6 +94,7 @@ services:
       - ./dbt_fp:/dbt_fp
       - ./spark:/spark
       - ./source_data:/source_data
+      - ./jars:/jars
     networks: [airflow_network]
 
   webserver:
@@ -132,6 +133,7 @@ services:
       - ./dbt_fp:/dbt_fp
       - ./spark:/spark
       - ./source_data:/source_data
+      - ./jars:/jars
     networks: [airflow_network]
 
   zookeeper:

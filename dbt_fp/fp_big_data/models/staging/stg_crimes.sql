@@ -17,6 +17,14 @@ WITH source AS (
     {% if is_incremental() %}
         WHERE load_timestamp > (SELECT MAX(load_timestamp) FROM {{ this }})
     {% endif %}
+
+    UNION ALL
+
+    SELECT * FROM {{ source('silver', 'silver_crimes_stream') }}
+
+    {% if is_incremental() %}
+        WHERE load_timestamp > (SELECT MAX(load_timestamp) FROM {{ this }})
+    {% endif %}
 ),
 
 renamed AS (

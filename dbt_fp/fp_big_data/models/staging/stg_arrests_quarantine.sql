@@ -5,9 +5,13 @@
     )
 }}
 
--- Arrests БЕЗ соответствующих crimes для дальнейшего анализа
+
 WITH source_arrests AS (
     SELECT * FROM {{ source('silver', 'silver_arrests') }}
+
+    UNION ALL
+
+    SELECT * FROM {{ source('silver', 'silver_arrests_stream') }}
 ),
 
 source_crimes AS (

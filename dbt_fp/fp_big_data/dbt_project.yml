@@ -57,6 +57,23 @@ models:
         +on_schema_change: "append_new_columns"
         +tags: ["arrests", "staging", "incremental"]
 
+    core:
+      +materialized: table
+      +schema: core
+      dim_crime_type:
+        +tags: [ 'dimension', 'daily' ]
+      dim_location:
+        +tags: [ 'dimension', 'daily' ]
+      fact_crimes:
+        +materialized: incremental
+        +tags: [ 'fact', 'hourly' ]
+      fact_arrests:
+        +materialized: incremental
+        +tags: [ 'fact', 'hourly' ]
+      agg_daily_crimes:
+        +materialized: incremental
+        +tags: [ 'aggregate', 'daily' ]
+
 vars:
   start_date: '2001-01-01'
   end_date: '2030-12-31'

@@ -120,7 +120,175 @@ sources:
           - name: source_file
             description: "Source file name"
 
+      - name: silver_crimes_stream
+        description: "Silver layer crime stream incidents data"
+        columns:
+          - name: crime_id
+            description: "Unique identifier for each crime"
+            tests:
+              - unique
+              - not_null
+
+          - name: case_number
+            description: "Chicago Police Department case number"
+            tests:
+              - not_null
+
+          - name: iucr_code
+            description: "Illinois Uniform Crime Reporting code"
+
+          - name: fbi_code
+            description: "FBI crime classification code"
+
+          - name: crime_datetime
+            description: "Date and time of crime occurrence"
+            tests:
+              - not_null
+
+          - name: crime_date
+            description: "Date of crime (without time component)"
+
+          - name: primary_type
+            description: "Primary crime type classification"
+
+          - name: description
+            description: "Detailed description of the crime"
+
+          - name: block
+            description: "Block address where crime occurred"
+
+          - name: location_description
+            description: "Description of the location"
+
+          - name: location_full_text
+            description: "Full text location details"
+
+          - name: beat_id
+            description: "Police beat identifier"
+
+          - name: district_id
+            description: "Police district identifier"
+
+          - name: ward_id
+            description: "Ward identifier"
+
+          - name: community_area_id
+            description: "Community area identifier"
+
+          - name: latitude
+            description: "Latitude coordinate"
+
+          - name: longitude
+            description: "Longitude coordinate"
+
+          - name: x_coordinate
+            description: "X coordinate (State Plane)"
+
+          - name: y_coordinate
+            description: "Y coordinate (State Plane)"
+
+          - name: location_geo_point
+            description: "Geospatial point"
+
+          - name: is_arrest
+            description: "Whether an arrest was made"
+
+          - name: is_domestic
+            description: "Whether crime was domestic-related"
+
+          - name: hash_row
+            description: "Hash of row for deduplication"
+
+          - name: load_timestamp
+            description: "Timestamp when record was loaded"
+            tests:
+              - not_null
+
+          - name: source_file
+            description: "Source file name"
+
       - name: silver_arrests
+        description: "Silver layer arrest stream records data"
+        columns:
+          - name: arrest_id
+            description: "Unique identifier for each arrest"
+            tests:
+              - unique
+              - not_null
+
+          - name: case_number
+            description: "Chicago Police Department case number"
+            tests:
+              - not_null
+
+          - name: arrest_date
+            description: "Date of arrest"
+            tests:
+              - not_null
+
+          - name: arrestee_race
+            description: "Race of arrestee"
+
+          - name: charge_one_statute
+            description: "Statute code for primary charge"
+
+          - name: charge_one_description
+            description: "Description of primary charge"
+
+          - name: charge_one_type
+            description: "Type of primary charge"
+
+          - name: charge_one_class
+            description: "Class of primary charge"
+
+          - name: charge_2_statute
+            description: "Statute code for second charge"
+
+          - name: charge_2_description
+            description: "Description of second charge"
+
+          - name: charge_2_type
+            description: "Type of second charge"
+
+          - name: charge_2_class
+            description: "Class of second charge"
+
+          - name: charge_3_statute
+            description: "Statute code for third charge"
+
+          - name: charge_3_description
+            description: "Description of third charge"
+
+          - name: charge_3_type
+            description: "Type of third charge"
+
+          - name: charge_3_class
+            description: "Class of third charge"
+
+          - name: charge_4_statute
+            description: "Statute code for fourth charge"
+
+          - name: charge_4_description
+            description: "Description of fourth charge"
+
+          - name: charge_4_type
+            description: "Type of fourth charge"
+
+          - name: charge_4_class
+            description: "Class of fourth charge"
+
+          - name: hash_row
+            description: "Hash of row for deduplication"
+
+          - name: load_timestamp
+            description: "Timestamp when record was loaded"
+            tests:
+              - not_null
+
+          - name: source_file
+            description: "Source file name"
+
+      - name: silver_arrests_stream
         description: "Silver layer arrest records data"
         columns:
           - name: arrest_id

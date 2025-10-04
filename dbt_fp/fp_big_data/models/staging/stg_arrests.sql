@@ -10,12 +10,24 @@
     )
 }}
 
-WITH source AS (
+WITH arrests_combined AS (
     SELECT * FROM {{ source('silver', 'silver_arrests') }}
 
     {% if is_incremental() %}
         WHERE load_timestamp > (SELECT MAX(load_timestamp) FROM {{ this }})
     {% endif %}
+
+    UNION ALL
+
+    SELECT * FROM {{ source('silver', 'silver_arrests_stream') }}
+
+    {% if is_incremental() %}
+        WHERE load_timestamp > (SELECT MAX(load_timestamp) FROM {{ this }})
+    {% endif %}
+),
+
+source AS (
+    SELECT * FROM arrests_combined
 ),
 
 valid_case_numbers AS (

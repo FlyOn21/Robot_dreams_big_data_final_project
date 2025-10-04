@@ -1,0 +1,213 @@
+version: 2
+
+models:
+
+  # DIMENSION TABLES
+  - name: dim_crime_type
+    description: "Dimension table for crime types standardization and analysis"
+    columns:
+      - name: iucr_code
+        description: "Unique crime code (Illinois Uniform Crime Reporting Code)"
+        tests:
+          - unique
+          - not_null
+
+      - name: primary_description
+        description: "Primary description of crime type"
+        tests:
+          - not_null
+
+      - name: secondary_description
+        description: "Detailed description of crime type"
+
+      - name: index_code
+        description: "Index code for classification"
+
+
+  - name: dim_location
+    description: "Dimension table for locations and geographic analysis of crimes"
+    columns:
+      - name: location_key
+        description: "Surrogate key for location"
+        tests:
+          - unique
+          - not_null
+
+      - name: block
+        description: "Block where the crime occurred"
+
+      - name: location_description
+        description: "Description of location type"
+
+      - name: latitude
+        description: "Geographic latitude"
+        tests:
+          - not_null
+
+      - name: longitude
+        description: "Geographic longitude"
+        tests:
+          - not_null
+
+      - name: x_coordinate
+        description: "X coordinate in projection"
+
+      - name: y_coordinate
+        description: "Y coordinate in projection"
+
+      - name: beat_id
+        description: "Police beat identifier"
+
+      - name: district_id
+        description: "Police district identifier"
+
+      - name: ward_id
+        description: "Ward identifier"
+
+      - name: community_area_id
+        description: "Community area identifier"
+
+      - name: location_full_text
+        description: "Full text description of location"
+
+  # FACT TABLES
+  - name: fact_crimes
+    description: "Detailed fact table for crimes"
+    columns:
+      - name: crime_id
+        description: "Unique crime identifier"
+        tests:
+          - unique
+          - not_null
+
+      - name: case_number
+        description: "Case number"
+
+      - name: crime_datetime
+        description: "Crime date and time"
+
+      - name: crime_date
+        description: "Crime date"
+        tests:
+          - not_null
+
+      - name: crime_hour
+        description: "Hour of day (0-23)"
+
+      - name: crime_day_of_week
+        description: "Day of week"
+
+      - name: crime_month
+        description: "Month"
+
+      - name: crime_year
+        description: "Year"
+
+      - name: is_arrest
+        description: "Whether an arrest was made"
+
+      - name: is_domestic
+        description: "Whether the crime is domestic violence"
+
+      - name: fbi_code
+        description: "FBI code"
+
+      - name: location_key
+        description: "Location key (relationship to dim_location)"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_location')
+              field: location_key
+
+      - name: iucr_code
+        description: "Crime type code (relationship to dim_crime_type)"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_crime_type')
+              field: iucr_code
+
+      - name: primary_description
+        description: "Primary crime type"
+
+      - name: secondary_description
+        description: "Detailed crime description"
+
+      - name: is_violent_crime
+        description: "Flag for violent crime"
+
+
+  - name: fact_arrests
+    description: "Detailed fact table for arrests"
+    columns:
+      - name: arrest_id
+        description: "Unique arrest identifier"
+        tests:
+          - unique
+          - not_null
+
+      - name: case_number
+        description: "Case number"
+
+      - name: arrest_date
+        description: "Arrest date"
+        tests:
+          - not_null
+
+      - name: arrestee_race
+        description: "Race of arrestee"
+
+      - name: arrestee_gender
+        description: "Gender of arrestee"
+        tests:
+          - accepted_values:
+              values: [ 'Male', 'Female', 'Unknown' ]
+
+      - name: primary_charge_code
+        description: "Primary charge code"
+        tests:
+          - relationships:
+              to: ref('dim_crime_type')
+              field: iucr_code
+
+      - name: primary_charge_description
+        description: "Description of primary charge"
+
+      - name: charge_type
+        description: "Charge type"
+
+      - name: crime_id
+        description: "Relationship to crime (if exists)"
+
+  # AGGREGATED TABLES
+  - name: agg_daily_crimes
+    description: "Aggregated overview of crimes by day"
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: "total_crimes >= crimes_with_arrest"
+    columns:
+      - name: crime_date
+        description: "Crime date"
+        tests:
+          - not_null
+
+      - name: primary_type
+        description: "Primary crime type"
+
+      - name: district_id
+        description: "Police district"
+
+      - name: community_area_id
+        description: "Community area"
+
+      - name: total_crimes
+        description: "Total number of crimes"
+        tests:
+          - not_null
+
+      - name: crimes_with_arrest
+        description: "Number of crimes with arrest"
+
+      - name: domestic_crimes
+        description: "Number of domestic violence incidents"

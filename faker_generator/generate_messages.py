@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 class CriminalDataExporter:
     """Handles exporting criminal data to various formats"""
 
-    def __init__(self, output_dir: str = "output"):
+    def __init__(self, output_dir: str = "output", iucr_csv_path: str = None):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
-        self.generator = DATA_GENERATOR
+        self.generator = CriminalJusticeDataGenerator(iucr_csv_path=iucr_csv_path)
 
     def to_dict_arrest(self, arrest) -> dict:
         """Convert arrest object to dictionary - uses exact field names and ensures all fields are present"""
@@ -180,8 +180,8 @@ class CriminalDataExporter:
 class CriminalDataStreamer:
     """Streams criminal data to various outputs"""
 
-    def __init__(self):
-        self.generator = DATA_GENERATOR
+    def __init__(self, iucr_csv_path: str = None):
+        self.generator = CriminalJusticeDataGenerator(iucr_csv_path=iucr_csv_path)
         self.stats = {
             'arrests_generated': 0,
             'crimes_generated': 0,
@@ -299,6 +299,7 @@ def main():
               %(prog)s --correlated 1000 --format json
               %(prog)s --stream console --count 100
               %(prog)s --stream kafka --size-mb 50
+              %(prog)s --iucr-csv path/to/iucr_codes.csv --crimes 1000
         """
     )
 
@@ -316,8 +317,12 @@ def main():
     parser.add_argument('--output-dir', default='output',
                         help='Output directory (default: output)')
 
+    # IUCR codes CSV path
+    parser.add_argument('--iucr-csv', type=str, default=None,
+                        help='Path to IUCR codes CSV file')
+
     # Streaming options
-    parser.add_argument('--stream', choices=['console', 'kafka'], default='console',
+    parser.add_argument('--stream', choices=['console', 'kafka'], default=None,
                         help='Stream data to specified output')
     parser.add_argument('--count', type=int, default=100,
                         help='Number of records for console streaming')
@@ -329,7 +334,7 @@ def main():
     args = parser.parse_args()
 
     if args.stream:
-        streamer = CriminalDataStreamer()
+        streamer = CriminalDataStreamer(iucr_csv_path=args.iucr_csv)
 
         if args.stream == 'console':
             streamer.stream_to_console(count=args.count)
@@ -340,7 +345,7 @@ def main():
             )
         return
 
-    exporter = CriminalDataExporter(output_dir=args.output_dir)
+    exporter = CriminalDataExporter(output_dir=args.output_dir, iucr_csv_path=args.iucr_csv)
 
     if args.correlated > 0:
         logger.info(f"Generating correlated dataset with {args.correlated} crimes")

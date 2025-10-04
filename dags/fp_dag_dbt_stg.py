@@ -22,14 +22,6 @@ default_args = {
     'retry_delay': timedelta(minutes=1),
 }
 
-# env_data = {
-#     "POSTGRES_URL": "jdbc:postgresql://dbt_hw_fp_host:5432/dbt_hw_fp",
-#     "POSTGRES_USER": "dbt_user",
-#     "POSTGRES_PASSWORD": "12345678",
-#     "PYTHONPATH": "/opt/airflow/dags:$PYTHONPATH",
-#     "JAVA_HOME": "/usr/lib/jvm/java-17-openjdk",
-# }
-
 with DAG(
         dag_id='fp_dag_dbt_stg',
         default_args=default_args,

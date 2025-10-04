@@ -3,6 +3,8 @@ import random
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
+import threading
+from pathlib import Path
 
 import factory
 import pandas as pd
@@ -22,6 +24,133 @@ __all__ = [
 ]
 
 fake = Faker()
+
+# Global counters for unique IDs (thread-safe)
+_crime_id_counter = threading.local()
+_arrest_id_counter = threading.local()
+_counter_lock = threading.Lock()
+
+
+def load_iucr_codes_from_csv(
+        csv_path: str = 'Chicago_Police_Department__Illinois_Uniform_Crime_Reporting_IUCR_Codes_20250928.csv') -> dict:
+    """
+    Load valid IUCR codes from the reference CSV file.
+    Returns a dictionary mapping IUCR code to PRIMARY DESCRIPTION.
+    """
+    try:
+        df = None
+
+        # Try multiple possible locations for the CSV file
+        possible_paths = [
+            csv_path,  # Direct path
+            Path(csv_path),  # As Path object
+            Path.cwd() / csv_path,  # Current directory
+            Path('data') / csv_path,  # data subdirectory
+            Path('source_data') / csv_path,  # source_data subdirectory
+            Path('..') / csv_path,  # Parent directory
+            Path('../data') / csv_path,  # Parent's data directory
+            Path('../source_data') / csv_path,  # Parent's source_data directory
+        ]
+
+        for try_path in possible_paths:
+            if Path(try_path).exists():
+                print(f"Found IUCR CSV at: {try_path}")
+                df = pd.read_csv(try_path)
+                break
+
+        if df is None:
+            print(f"Warning: Could not find {csv_path} in any standard location")
+            print(f"Searched paths: {[str(p) for p in possible_paths[:5]]}")
+            return _get_fallback_iucr_mapping()
+
+        # Filter for active codes only
+        if 'ACTIVE' in df.columns:
+            active_df = df[df['ACTIVE'] == True].copy()
+            print(f"Loaded {len(active_df)} active IUCR codes (filtered from {len(df)} total)")
+        else:
+            active_df = df.copy()
+            print(f"Loaded {len(active_df)} IUCR codes (no ACTIVE column found)")
+
+        # Create mapping of IUCR -> PRIMARY DESCRIPTION
+        iucr_mapping = {}
+        for _, row in active_df.iterrows():
+            # Clean and normalize IUCR code
+            iucr_code = str(row['IUCR']).strip()
+
+            # Some IUCR codes might have leading zeros stripped - try to preserve them
+            # But also handle numeric codes that need padding
+            if iucr_code.isdigit() and len(iucr_code) <= 4:
+                # Keep as-is for now, don't pad
+                pass
+
+            primary_desc = str(row['PRIMARY DESCRIPTION']).strip()
+            iucr_mapping[iucr_code] = primary_desc
+
+        print(f"Successfully created mapping with {len(iucr_mapping)} IUCR codes")
+        # Print first few codes as verification
+        sample_codes = list(iucr_mapping.keys())[:5]
+        print(f"Sample IUCR codes: {sample_codes}")
+
+        return iucr_mapping
+
+    except Exception as e:
+        print(f"Error loading IUCR codes: {e}")
+        import traceback
+        traceback.print_exc()
+        print("Using fallback mapping with 23 codes")
+        return _get_fallback_iucr_mapping()
+
+
+def _get_fallback_iucr_mapping() -> dict:
+    """Fallback IUCR mapping if CSV cannot be loaded"""
+    return {
+        "110": "HOMICIDE",
+        "130": "HOMICIDE",
+        "261": "CRIM SEXUAL ASSAULT",
+        "265": "CRIM SEXUAL ASSAULT",
+        "460": "BATTERY",
+        "486": "BATTERY",
+        "560": "ASSAULT",
+        "610": "BURGLARY",
+        "620": "BURGLARY",
+        "810": "THEFT",
+        "820": "THEFT",
+        "840": "THEFT",
+        "860": "THEFT",
+        "890": "THEFT",
+        "1110": "DECEPTIVE PRACTICE",
+        "1120": "DECEPTIVE PRACTICE",
+        "1400": "CRIMINAL DAMAGE",
+        "1410": "CRIMINAL DAMAGE",
+        "1811": "NARCOTICS",
+        "1821": "NARCOTICS",
+        "1840": "NARCOTICS",
+        "2020": "WEAPONS VIOLATION",
+        "2024": "WEAPONS VIOLATION"
+    }
+
+
+# Load IUCR codes from CSV at module import time
+IUCR_CODES_MAPPING = load_iucr_codes_from_csv()
+
+
+def get_next_crime_id():
+    """Get next unique crime ID"""
+    if not hasattr(_crime_id_counter, 'value'):
+        _crime_id_counter.value = 1000000
+    with _counter_lock:
+        _crime_id_counter.value += 1
+        return _crime_id_counter.value
+
+
+def get_next_arrest_id():
+    """Get next unique arrest ID (CB number)"""
+    if not hasattr(_arrest_id_counter, 'value'):
+        # Start at a higher number to avoid conflicts with existing data
+        _arrest_id_counter.value = 50000000
+    with _counter_lock:
+        _arrest_id_counter.value += 1
+        return _arrest_id_counter.value
 
 
 # Enums for controlled vocabulary
@@ -159,32 +288,8 @@ class CriminalJusticeProvider(BaseProvider):
     CHICAGO_LON_MIN = -87.940
     CHICAGO_LON_MAX = -87.524
 
-
-    IUCR_MAPPING = {
-        "110": "HOMICIDE",
-        "130": "HOMICIDE",
-        "261": "CRIM SEXUAL ASSAULT",
-        "265": "CRIM SEXUAL ASSAULT",
-        "460": "BATTERY",
-        "486": "BATTERY",
-        "560": "ASSAULT",
-        "610": "BURGLARY",
-        "620": "BURGLARY",
-        "810": "THEFT",
-        "820": "THEFT",
-        "840": "THEFT",
-        "860": "THEFT",
-        "890": "THEFT",
-        "1110": "DECEPTIVE PRACTICE",
-        "1120": "DECEPTIVE PRACTICE",
-        "1400": "CRIMINAL DAMAGE",
-        "1410": "CRIMINAL DAMAGE",
-        "1811": "NARCOTICS",
-        "1821": "NARCOTICS",
-        "1840": "NARCOTICS",
-        "2020": "WEAPONS VIOLATION",
-        "2024": "WEAPONS VIOLATION"
-    }
+    # Use loaded IUCR codes from CSV
+    IUCR_MAPPING = IUCR_CODES_MAPPING
 
     FBI_CODE_MAPPING = {
         "01A": "HOMICIDE",
@@ -213,11 +318,11 @@ class CriminalJusticeProvider(BaseProvider):
 
     @staticmethod
     def cb_number():
-        """Generate CB (Complaint Bureau) number"""
-        return random.randint(10000000, 99999999)
+        """Generate unique CB (Complaint Bureau) number"""
+        return get_next_arrest_id()
 
     def iucr_code(self):
-        """Get random IUCR code"""
+        """Get random IUCR code - ONLY from valid codes"""
         return random.choice(list(self.IUCR_MAPPING.keys()))
 
     def fbi_code(self):
@@ -279,6 +384,7 @@ class CriminalJusticeProvider(BaseProvider):
         subsection = random.randint(1, 20)
         return f"{chapter} ILCS {section}/{subsection}"
 
+
 factory.Faker.add_provider(CriminalJusticeProvider)
 
 
@@ -325,9 +431,9 @@ class ArrestFactory(factory.Factory):
     class Meta:
         model = Arrest
 
-    cb_no = factory.Faker('cb_number')
+    cb_no = factory.Faker('cb_number')  # Now uses unique counter
     case_number = factory.Faker('case_number')
-    arrest_date = factory.Faker('date_between', start_date='-2y', end_date='today')
+    arrest_date = factory.Faker('date_between', start_date='-2y', end_date='-1d')
     race = factory.Faker('random_element', elements=[r.value for r in Race])
 
     def __init__(self):
@@ -377,11 +483,11 @@ class CrimeFactory(factory.Factory):
     class Meta:
         model = Crime
 
-    id = factory.Sequence(lambda n: n + 1000000)
+    id = factory.LazyFunction(get_next_crime_id)  # Now uses unique counter
     case_number = factory.Faker('case_number')
-    date = factory.Faker('date_time_between', start_date='-2y', end_date='now')
+    date = factory.Faker('date_time_between', start_date='-1y', end_date='-1d')
     block = factory.Faker('block_address')
-    iucr = factory.Faker('iucr_code')
+    iucr = factory.Faker('iucr_code')  # Now only uses valid codes
     location_description = factory.Faker('random_element', elements=[location.value for location in LocationType])
     arrest = factory.Faker('boolean', chance_of_getting_true=25)
     domestic = factory.Faker('boolean', chance_of_getting_true=15)
@@ -409,18 +515,40 @@ class CrimeFactory(factory.Factory):
     def description(self):
         """Generate detailed description based on primary type"""
         descriptions = {
-            "THEFT": ["RETAIL THEFT", "THEFT FROM VEHICLE", "THEFT OF PROPERTY", "POCKET-PICKING"],
-            "BATTERY": ["SIMPLE BATTERY", "DOMESTIC BATTERY SIMPLE", "AGG DOMESTIC BATTERY"],
-            "CRIMINAL DAMAGE": ["TO PROPERTY", "TO VEHICLE", "TO CITY OF CHICAGO PROPERTY"],
-            "NARCOTICS": ["POSS: CANNABIS 30GMS OR LESS", "POSS: HEROIN(WHITE)", "POSS: COCAINE"],
-            "ASSAULT": ["SIMPLE ASSAULT", "AGG ASSAULT", "DOMESTIC ASSAULT"],
+            "THEFT": ["RETAIL THEFT", "THEFT FROM VEHICLE", "THEFT OF PROPERTY", "POCKET-PICKING", "$500 AND UNDER"],
+            "BATTERY": ["SIMPLE BATTERY", "DOMESTIC BATTERY SIMPLE", "AGG DOMESTIC BATTERY", "AGGRAVATED"],
+            "CRIMINAL DAMAGE": ["TO PROPERTY", "TO VEHICLE", "TO CITY OF CHICAGO PROPERTY",
+                                "TO STATE SUPPORTED PROPERTY"],
+            "NARCOTICS": ["POSS: CANNABIS 30GMS OR LESS", "POSS: HEROIN(WHITE)", "POSS: COCAINE", "MANU/DELIVER"],
+            "ASSAULT": ["SIMPLE ASSAULT", "AGG ASSAULT", "DOMESTIC ASSAULT", "AGGRAVATED"],
             "BURGLARY": ["FORCIBLE ENTRY", "UNLAWFUL ENTRY", "ATTEMPTED FORCIBLE ENTRY"],
-            "ROBBERY": ["ARMED: HANDGUN", "STRONGARM - NO WEAPON", "ARMED: OTHER FIREARM"],
-            "HOMICIDE": ["FIRST DEGREE MURDER", "SECOND DEGREE MURDER", "INVOLUNTARY MANSLAUGHTER"]
+            "ROBBERY": ["ARMED: HANDGUN", "STRONGARM - NO WEAPON", "ARMED: OTHER FIREARM",
+                        "ARMED: OTHER DANGEROUS WEAPON"],
+            "HOMICIDE": ["FIRST DEGREE MURDER", "SECOND DEGREE MURDER", "INVOLUNTARY MANSLAUGHTER",
+                         "RECKLESS HOMICIDE"],
+            "MOTOR VEHICLE THEFT": ["AUTOMOBILE", "TRUCK, BUS, MOTOR HOME", "CYCLE, SCOOTER, BIKE WITH VIN"],
+            "DECEPTIVE PRACTICE": ["FINANCIAL IDENTITY THEFT OVER $300", "CREDIT CARD FRAUD", "IMPERSONATION",
+                                   "FORGERY"],
+            "CRIMINAL TRESPASS": ["TO LAND", "TO RESIDENCE", "TO VEHICLE", "TO STATE SUPPORTED LAND"],
+            "WEAPONS VIOLATION": ["UNLAWFUL POSS OF HANDGUN", "UNLAWFUL USE HANDGUN", "POSS FIREARM/AMMO:NO FOID CARD"],
+            "CRIM SEXUAL ASSAULT": ["PREDATORY", "AGGRAVATED", "NON-AGGRAVATED"],
+            "PROSTITUTION": ["CALL OPERATION", "SOLICIT FOR PROSTITUTE", "SOLICIT FOR BUSINESS"],
+            "OFFENSE INVOLVING CHILDREN": ["CHILD ABUSE", "CHILD PORNOGRAPHY", "CRIMINAL SEXUAL ABUSE"],
+            "SEX OFFENSE": ["NON AGGRAVATED", "AGGRAVATED SEXUAL ABUSE", "PUBLIC INDECENCY"],
+            "KIDNAPPING": ["CHILD ABDUCTION/STRANGER", "AGGRAVATED", "UNLAWFUL RESTRAINT"],
+            "ARSON": ["BY EXPLOSIVE", "BY FIRE", "AGGRAVATED"],
+            "INTERFERENCE WITH PUBLIC OFFICER": ["OBSTRUCTING JUSTICE", "RESISTING/OBSTRUCTING A PEACE OFFICER"],
+            "PUBLIC PEACE VIOLATION": ["RECKLESS CONDUCT", "BOMB THREAT", "MOB ACTION"],
+            "INTIMIDATION": ["EDUCATIONAL INSTITUTION", "RESIDENTIAL", "AGGRAVATED"]
         }
 
-        type_descriptions = descriptions.get(self.primary_type, ["UNSPECIFIED"])
-        return random.choice(type_descriptions)
+        # If the primary type has specific descriptions, use them
+        type_descriptions = descriptions.get(self.primary_type, None)
+
+        if type_descriptions:
+            return random.choice(type_descriptions)
+        else:
+            return f"{self.primary_type} - UNSPECIFIED"
 
     @factory.lazy_attribute
     def year(self):
@@ -447,9 +575,22 @@ class CrimeFactory(factory.Factory):
 class CriminalJusticeDataGenerator:
     """Main data generator for criminal justice data"""
 
-    def __init__(self):
+    def __init__(self, iucr_csv_path: str = None):
+        """
+        Initialize data generator.
+
+        Args:
+            iucr_csv_path: Optional path to IUCR codes CSV file. If provided, will reload codes.
+        """
         self.arrest_factory = ArrestFactory
         self.crime_factory = CrimeFactory
+
+        # Reload IUCR codes if custom path provided
+        if iucr_csv_path:
+            global IUCR_CODES_MAPPING
+            IUCR_CODES_MAPPING = load_iucr_codes_from_csv(iucr_csv_path)
+            CriminalJusticeProvider.IUCR_MAPPING = IUCR_CODES_MAPPING
+            print(f"Reloaded IUCR codes from {iucr_csv_path}")
 
     def generate_arrests(self, count: int = 100) -> list[ArrestFactory]:
         """Generate arrest records"""
@@ -469,7 +610,6 @@ class CriminalJusticeDataGenerator:
             crimes_data.append(crime)
 
             if crime.arrest:
-
                 arrest = self.arrest_factory(
                     case_number=crime.case_number,
                     arrest_date=crime.date.strftime('%m/%d/%Y')
@@ -484,8 +624,6 @@ class CriminalJusticeDataGenerator:
     @staticmethod
     def save_to_csv(data: list, filename: str, data_type: str = 'crime'):
         """Save data to CSV file"""
-
-
         records = []
         if data_type == 'arrest':
             for arrest in data:
