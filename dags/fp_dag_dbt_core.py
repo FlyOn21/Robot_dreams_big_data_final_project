@@ -54,7 +54,7 @@ with DAG(
             set -e
             cd /dbt_fp/fp_big_data
             echo "Running dim_crime_type..."
-            dbt run --select dim_crime_type --full-refresh --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
+            dbt run --select dim_crime_type --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
             """
     )
 
@@ -64,7 +64,7 @@ with DAG(
             set -e
             cd /dbt_fp/fp_big_data
             echo "Running dim_location..."
-            dbt run --select dim_location --full-refresh --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
+            dbt run --select dim_location --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
             """
     )
 
@@ -76,7 +76,7 @@ with DAG(
             set -e
             cd /dbt_fp/fp_big_data
             echo "Running fact_crimes..."
-            dbt run --select fact_crimes --full-refresh --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
+            dbt run --select fact_crimes --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
             """
     )
 
@@ -86,7 +86,7 @@ with DAG(
             set -e
             cd /dbt_fp/fp_big_data
             echo "Running fact_arrests..."
-            dbt run --select fact_arrests --full-refresh --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
+            dbt run --select fact_arrests --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
             """
     )
 
@@ -99,7 +99,7 @@ with DAG(
             set -e
             cd /dbt_fp/fp_big_data
             echo "Running agg_daily_crimes..."
-            dbt run --select agg_daily_crimes --full-refresh --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
+            dbt run --select agg_daily_crimes --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
             """
     )
 

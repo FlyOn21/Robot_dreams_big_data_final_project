@@ -22,8 +22,9 @@ WITH crimes AS (
         iucr_code,
         primary_type,
 
-        -- Location attributes
-        block,
+        -- Location attributes for join
+        COALESCE(block, 'Unknown') AS block,
+        COALESCE(location_description, 'Unknown') AS location_description,
         latitude,
         longitude,
         beat_id,
@@ -37,13 +38,20 @@ WITH crimes AS (
     {% endif %}
 ),
 
-locations AS (
+crimes_with_location_key AS (
     SELECT
-        location_key,
-        block,
-        latitude,
-        longitude
-    FROM {{ ref('dim_location') }}
+        c.*,
+        {{ dbt_utils.generate_surrogate_key([
+            'c.block',
+            'c.location_description',
+            'c.latitude',
+            'c.longitude',
+            'COALESCE(c.beat_id, -1)',
+            'COALESCE(c.district_id, -1)',
+            'COALESCE(c.ward_id, -1)',
+            'COALESCE(c.community_area_id, -1)'
+        ]) }} AS location_key
+    FROM crimes c
 ),
 
 crime_types AS (
@@ -68,12 +76,21 @@ SELECT
     c.is_domestic,
     c.fbi_code,
 
-    l.location_key,
+    -- Location and crime type references
+    c.location_key,
     c.iucr_code,
 
-    ct.primary_description,
-    ct.secondary_description,
+    -- Location attributes for aggregations
+    c.beat_id,
+    c.district_id,
+    c.ward_id,
+    c.community_area_id,
 
+    -- Crime type descriptions
+    COALESCE(ct.primary_description, 'Unknown') AS primary_description,
+    COALESCE(ct.secondary_description, 'Unknown') AS secondary_description,
+
+    -- Additional flag for violent crimes
     CASE
         WHEN ct.index_code = 'I'
           OR ct.primary_description IN ('HOMICIDE', 'ASSAULT', 'BATTERY', 'ROBBERY', 'SEXUAL ASSAULT')
@@ -81,10 +98,6 @@ SELECT
         ELSE FALSE
     END AS is_violent_crime
 
-FROM crimes c
-LEFT JOIN locations l
-    ON c.block = l.block
-    AND c.latitude = l.latitude
-    AND c.longitude = l.longitude
+FROM crimes_with_location_key c
 LEFT JOIN crime_types ct
     ON c.iucr_code = ct.iucr_code

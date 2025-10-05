@@ -2,13 +2,10 @@
 import logging
 import traceback
 
-from pyspark.sql import DataFrame
-from pyspark.sql.functions import (
-    col, to_timestamp, to_date, concat_ws, coalesce, lit
-)
-from pyspark.sql.types import IntegerType, DoubleType
-
 from base_transformer import SilverTransformer
+from pyspark.sql import DataFrame
+from pyspark.sql.functions import coalesce, col, concat_ws, lit, to_date, to_timestamp
+from pyspark.sql.types import DoubleType, IntegerType
 
 
 class CrimesTransformer(SilverTransformer):
@@ -145,9 +142,6 @@ class CrimesTransformer(SilverTransformer):
         3. Handle NULL values
         4. Add derived columns
         5. Select final columns
-
-        Note: Deduplication by hash_row and load_timestamp
-        is handled automatically by the base class
         """
         df = self.select_and_rename_columns(df)
         df = self.convert_data_types(df)

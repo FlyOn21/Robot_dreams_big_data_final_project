@@ -7,9 +7,8 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 import psycopg2
-from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql import Window
-from pyspark.sql.functions import col, row_number, desc, to_timestamp, unix_timestamp
+from pyspark.sql import DataFrame, SparkSession, Window
+from pyspark.sql.functions import col, desc, row_number, to_timestamp, unix_timestamp
 
 
 class SilverTransformer(ABC):
@@ -22,12 +21,9 @@ class SilverTransformer(ABC):
     def __init__(self, app_name: str):
         """
         Initialize the transformer
-
-        Args:
-            app_name: Name of the Spark application
         """
         self.app_name = app_name
-        self.spark: Optional[SparkSession] = None
+        self.spark: SparkSession | None = None
         self.logger = logging.getLogger(self.__class__.__name__)
 
         # PostgreSQL configuration
@@ -233,18 +229,14 @@ class SilverTransformer(ABC):
         try:
             self.create_spark_session()
 
-            # Read from bronze
             bronze_table = self.get_bronze_table_name()
             df_bronze = self.read_from_bronze(bronze_table)
 
-            # Transform
             self.logger.info("Applying transformations...")
             df_transformed = self.transform(df_bronze)
 
-            # Deduplicate by hash_row and load_timestamp
             df_silver = self.deduplicate_by_hash_and_timestamp(df_transformed)
 
-            # Write to silver
             silver_table = self.get_silver_table_name()
             write_mode = self.get_write_mode()
             self.write_to_silver(df_silver, silver_table, mode=write_mode)

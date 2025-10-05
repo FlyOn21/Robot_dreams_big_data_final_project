@@ -53,7 +53,7 @@ with DAG(
             set -e
             cd /dbt_fp/fp_big_data
             echo "Running stg_ucr_codes..."
-            dbt run --select stg_ucr_codes --full-refresh --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
+            dbt run --select stg_ucr_codes --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
             """
     )
 
@@ -63,7 +63,7 @@ with DAG(
             set -e
             cd /dbt_fp/fp_big_data
             echo "Running stg_crimes..."
-            dbt run --select stg_crimes --full-refresh --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
+            dbt run --select stg_crimes --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
             """
     )
 
@@ -73,7 +73,7 @@ with DAG(
             set -e
             cd /dbt_fp/fp_big_data
             echo "Running stg_arrests..."
-            dbt run --select stg_arrests --full-refresh --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
+            dbt run --select stg_arrests --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
             """
     )
 
@@ -83,7 +83,7 @@ with DAG(
             set -e
             cd /dbt_fp/fp_big_data
             echo "Running stg_arrests_quarantine..."
-            dbt run --select stg_arrests_quarantine --full-refresh --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
+            dbt run --select stg_arrests_quarantine --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
             """
     )
 

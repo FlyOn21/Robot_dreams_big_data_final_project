@@ -3,10 +3,9 @@ import logging
 import os
 import traceback
 
-from pyspark.sql import DataFrame
-from pyspark.sql.functions import col, trim, upper, coalesce, lit, when
-
 from base_transformer import SilverTransformer
+from pyspark.sql import DataFrame
+from pyspark.sql.functions import coalesce, col, lit, trim, upper, when
 
 
 class UCRCodesTransformer(SilverTransformer):
@@ -64,7 +63,7 @@ class UCRCodesTransformer(SilverTransformer):
         self.logger.info("Filtering for active codes only")
 
         initial_count = df.count()
-        df = df.filter(col("is_active") == True)
+        df = df.filter(col("is_active"))
         final_count = df.count()
 
         inactive_count = initial_count - final_count
@@ -109,7 +108,7 @@ class UCRCodesTransformer(SilverTransformer):
         self.logger.info("Removing duplicates by iucr_code")
 
         from pyspark.sql import Window
-        from pyspark.sql.functions import row_number, desc
+        from pyspark.sql.functions import desc, row_number
 
         initial_count = df.count()
 
@@ -157,8 +156,6 @@ class UCRCodesTransformer(SilverTransformer):
         6. Deduplicate by iucr_code (keep most recent)
         7. Select final columns
 
-        Note: UCR codes don't have hash_row, so we deduplicate
-        by iucr_code instead using custom logic
         """
         df = self.select_and_rename_columns(df)
         df = self.convert_active_to_boolean(df)

@@ -360,9 +360,22 @@ cython_debug/
 
 .databricks
 #dbt
-HW_13/DB_COURSE_DBT_HW/target/
-HW_13/DB_COURSE_DBT_HW/dbt_packages/
-HW_13/DB_COURSE_DBT_HW/logs/
+target/
+dbt_modules/
+logs/
+dbt_packages/
 
-./HW_16/joined_streams_results_checkpoint/*
-./HW_16/fraud_detection_results_checkpoint/*
+/silver
+/silver/*
+
+/jars
+/jars/*
+
+/examples
+/examples/*
+
+/checkpoints
+/checkpoints/*
+
+/spark/bronze/bronze_parquet
+/spark/bronze/bronze_parquet/*

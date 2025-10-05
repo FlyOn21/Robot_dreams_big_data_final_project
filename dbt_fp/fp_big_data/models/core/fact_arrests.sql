@@ -6,16 +6,19 @@
   )
 }}
 
-WITH arrests AS (
+WITH source_arrests AS (
     SELECT
         arrest_id,
         case_number,
         arrest_date,
         arrestee_race,
-        arrestee_gender,
-        primary_charge_code,
-        primary_charge_description,
-        charge_type
+        charge_one_statute,
+        charge_one_description,
+        charge_one_type,
+        charge_one_class,
+        is_felony_charge,
+        has_multiple_charges,
+        charge_count
     FROM {{ ref('stg_arrests') }}
 
     {% if is_incremental() %}
@@ -37,27 +40,41 @@ crimes AS (
         case_number,
         crime_date
     FROM {{ ref('fact_crimes') }}
+),
+
+arrests_with_crimes AS (
+    SELECT
+        a.*,
+        ct.primary_description AS charge_primary_type,
+        ct.secondary_description AS charge_secondary_type,
+        c.crime_id,
+        ROW_NUMBER() OVER (
+            PARTITION BY a.arrest_id
+            ORDER BY c.crime_date DESC
+        ) AS rn
+    FROM source_arrests a
+    LEFT JOIN crime_types ct
+        ON a.charge_one_statute = ct.iucr_code
+    LEFT JOIN crimes c
+        ON a.case_number = c.case_number
+        AND a.arrest_date >= c.crime_date
+        AND a.arrest_date <= c.crime_date + INTERVAL '30 days'
 )
 
 SELECT
-    a.arrest_id,
-    a.case_number,
-    a.arrest_date,
-    a.arrestee_race,
-    a.arrestee_gender,
-    a.primary_charge_code,
-    a.primary_charge_description,
-    a.charge_type,
-
-    ct.primary_description AS charge_primary_type,
-    ct.secondary_description AS charge_secondary_type,
-
-    c.crime_id
-
-FROM arrests a
-LEFT JOIN crime_types ct
-    ON a.primary_charge_code = ct.iucr_code
-LEFT JOIN crimes c
-    ON a.case_number = c.case_number
-    AND a.arrest_date >= c.crime_date
-    AND a.arrest_date <= DATEADD(day, 30, c.crime_date) -- arrest within 30 days after crime
+    arrest_id,
+    case_number,
+    arrest_date,
+    arrestee_race,
+    charge_one_statute AS primary_charge_code,
+    charge_one_description AS primary_charge_description,
+    charge_one_type AS charge_type,
+    charge_one_class,
+    is_felony_charge,
+    has_multiple_charges,
+    charge_count,
+    charge_primary_type,
+    charge_secondary_type,
+    crime_id
+FROM arrests_with_crimes
+WHERE rn = 1

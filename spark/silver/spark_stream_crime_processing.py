@@ -7,18 +7,23 @@ import os
 import shutil
 import tempfile
 import traceback
-import psycopg2
 from pathlib import Path
 
+import psycopg2
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import (
-    col, from_json, to_timestamp, to_date, concat_ws,
-    coalesce, lit, current_timestamp, md5, concat
+    coalesce,
+    col,
+    concat,
+    concat_ws,
+    current_timestamp,
+    from_json,
+    lit,
+    md5,
+    to_date,
+    to_timestamp,
 )
-from pyspark.sql.types import (
-    StructType, StructField, StringType, IntegerType,
-    DoubleType, BooleanType
-)
+from pyspark.sql.types import BooleanType, DoubleType, IntegerType, StringType, StructField, StructType
 
 logging.basicConfig(
     level=logging.INFO,
@@ -193,7 +198,6 @@ class CrimeStreamProcessor:
         df = df.withColumn("load_timestamp", current_timestamp())
         df = df.withColumn("source_file", lit("kafka_stream"))
 
-        # Create hash_row for deduplication
         df = df.withColumn(
             "hash_row",
             md5(concat(
@@ -203,7 +207,7 @@ class CrimeStreamProcessor:
             ))
         )
 
-        # Select final columns
+
         final_columns = [
             "crime_id", "case_number", "crime_datetime", "crime_date",
             "block", "iucr_code", "primary_type", "description",
@@ -330,8 +334,7 @@ class CrimeStreamProcessor:
             hash_row VARCHAR(32),
             load_timestamp TIMESTAMP,
             source_file VARCHAR(50)
-        );
-        
+        );     
         CREATE INDEX IF NOT EXISTS idx_crimes_hash ON silver.silver_crimes_stream(hash_row);
         CREATE INDEX IF NOT EXISTS idx_crimes_date ON silver.silver_crimes_stream(crime_date);
         CREATE INDEX IF NOT EXISTS idx_crimes_case ON silver.silver_crimes_stream(case_number);
@@ -403,10 +406,8 @@ def main():
             output_dir="./silver/crimes"
         )
         processor.ensure_postgres_table()
-        # Start streaming (change output_mode as needed)
         queries = processor.run(output_mode="all")
 
-        # Wait for termination
         for query in queries:
             query.awaitTermination()
 

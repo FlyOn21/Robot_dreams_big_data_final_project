@@ -7,17 +7,24 @@ import os
 import shutil
 import tempfile
 import traceback
-import psycopg2
 from pathlib import Path
 
+import psycopg2
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import (
-    col, from_json, to_date, trim, upper, coalesce, lit,
-    when, current_timestamp, md5, concat
+    coalesce,
+    col,
+    concat,
+    current_timestamp,
+    from_json,
+    lit,
+    md5,
+    to_date,
+    trim,
+    upper,
+    when,
 )
-from pyspark.sql.types import (
-    StructType, StructField, StringType, IntegerType
-)
+from pyspark.sql.types import IntegerType, StringType, StructField, StructType
 
 logging.basicConfig(
     level=logging.INFO,
@@ -139,19 +146,16 @@ class ArrestStreamProcessor:
         """Apply silver layer transformations"""
         logger.info("Applying transformations...")
 
-        # Parse JSON
         df = df.select(
             from_json(col("json_str"), self.get_schema()).alias("data")
         ).select("data.*")
 
-        # Filter out records with empty case_number
-        initial_count = -1 if df.isStreaming else df.count()
+        -1 if df.isStreaming else df.count()
         df = df.filter(
             col("case_number").isNotNull() &
             (trim(col("case_number")) != "")
         )
 
-        # Select and rename columns
         df = df.select(
             col("cb_no").alias("arrest_id"),
             col("case_number"),
@@ -175,7 +179,6 @@ class ArrestStreamProcessor:
             col("charge_4_class")
         )
 
-        # Parse arrest_date - try multiple formats
         df = df.withColumn(
             "arrest_date",
             coalesce(
@@ -202,11 +205,9 @@ class ArrestStreamProcessor:
                           coalesce(col("arrestee_race"), lit("Unknown")))
               )
 
-        # Add metadata columns
         df = df.withColumn("load_timestamp", current_timestamp())
         df = df.withColumn("source_file", lit("kafka_stream"))
 
-        # Create hash_row for deduplication
         df = df.withColumn(
             "hash_row",
             md5(concat(
@@ -216,7 +217,6 @@ class ArrestStreamProcessor:
             ))
         )
 
-        # Select final columns
         final_columns = [
             "arrest_id", "case_number", "arrest_date",
             "arrestee_race",
@@ -348,11 +348,10 @@ class ArrestStreamProcessor:
                                 hash_row VARCHAR(32),
                                 load_timestamp TIMESTAMP,
                                 source_file VARCHAR(50)
-                            );
-                            
-                            CREATE INDEX IF NOT EXISTS idx_arrests_hash ON silver.silver_arrests_stream(hash_row);
-                            CREATE INDEX IF NOT EXISTS idx_arrests_date ON silver.silver_arrests_stream(arrest_date);
-                            CREATE INDEX IF NOT EXISTS idx_arrests_case ON silver.silver_arrests_stream(case_number);
+                            );      
+                    CREATE INDEX IF NOT EXISTS idx_arrests_hash ON silver.silver_arrests_stream(hash_row);
+                    CREATE INDEX IF NOT EXISTS idx_arrests_date ON silver.silver_arrests_stream(arrest_date);
+                    CREATE INDEX IF NOT EXISTS idx_arrests_case ON silver.silver_arrests_stream(case_number);
                                """
 
             cursor.execute(create_table_sql)

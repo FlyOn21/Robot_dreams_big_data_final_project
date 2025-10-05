@@ -9,13 +9,12 @@ from pyspark.sql.types import StringType, StructField, StructType
 
 from spark.bronze.bronze_utils.write_to_postgres import write_to_postgres_bronze
 
-# Bronze schema for UCR codes (read all as text first, then coerce 'active' to boolean)
 UCR_SCHEMA = StructType([
     StructField("iucr", StringType(), True),
     StructField("primary_description", StringType(), True),
     StructField("secondary_description", StringType(), True),
     StructField("index_code", StringType(), True),
-    StructField("active", StringType(), True),  # checkbox in CSV -> will coerce to boolean after read
+    StructField("active", StringType(), True),
 ])
 
 SPARK_JARS = os.getenv("SPARK_JARS", "/jars/postgresql-42.7.0.jar")
@@ -25,9 +24,9 @@ def create_spark_session() -> SparkSession:
         SparkSession.builder
         .appName("Bronze_Chicago_UCR_Codes_Ingest")
         .config("spark.sql.shuffle.partitions", "50")
-        .config("spark.jars", SPARK_JARS)  # Removed f-string, not needed
-        .config("spark.driver.extraClassPath", SPARK_JARS)  # Add for reliability
-        .config("spark.executor.extraClassPath", SPARK_JARS)  # Add for reliability
+        .config("spark.jars", SPARK_JARS)
+        .config("spark.driver.extraClassPath", SPARK_JARS)
+        .config("spark.executor.extraClassPath", SPARK_JARS)
         .getOrCreate()
     )
 
@@ -37,7 +36,6 @@ def main():
     logger = logging.getLogger("bronze_chicago_ucr_codes")
 
     source_dir = os.getenv("UCR_SOURCE_DIR", "/source_data")
-    # Be lenient with filename (long official name)
     patterns = [
         os.path.join(source_dir, "Chicago_Police_Department*Uniform_Crime*csv"),
         os.path.join(source_dir, "Chicago*Uniform*Crime*csv"),
@@ -68,7 +66,7 @@ def main():
 
         (
             df.write
-            .mode("overwrite")  # static reference/dictionary
+            .mode("overwrite")
             .parquet(table_dir)
         )
 

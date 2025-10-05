@@ -2,12 +2,9 @@
 import logging
 import traceback
 
-from pyspark.sql import DataFrame
-from pyspark.sql.functions import (
-    col, when, to_date, trim, upper, coalesce, lit
-)
-
 from base_transformer import SilverTransformer
+from pyspark.sql import DataFrame
+from pyspark.sql.functions import coalesce, col, lit, to_date, trim, upper, when
 
 
 class ArrestsTransformer(SilverTransformer):
@@ -147,8 +144,6 @@ class ArrestsTransformer(SilverTransformer):
         5. Handle NULL values
         6. Select final columns
 
-        Note: Deduplication by hash_row and load_timestamp
-        is handled automatically by the base class
         """
         df = self.select_and_rename_columns(df)
         df = self.filter_invalid_records(df)

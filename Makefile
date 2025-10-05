@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help fp-demon-up fp-up fp-down fp-clean kafka-create-topics kafka-delete-topics kafka-list-topics kafka-logs kafka-status kafka-shell tools-check execute-crime-listener execute-arrest-listener execute-all-listeners stop-listeners execute-producer execute-producer-large
+.PHONY: help fp-demon-up fp-up fp-down fp-clean kafka-create-topics kafka-delete-topics kafka-list-topics kafka-logs kafka-status kafka-shell tools-check execute-crime-listener execute-arrest-listener execute-all-listeners stop-listeners execute-producer execute-producer-large ruff-check ruff-fix
 
 
 help: ## Show this help message
@@ -94,3 +94,12 @@ execute-producer: ## Run the data producer
 execute-producer-large: ## Run the data producer with 50MB
 	python3 ${PWD}/faker_generator/generate_messages.py --stream kafka --size-mb 50 \
 		--iucr-csv /home/flyon21/PycharmProjects/BD_robot_dreams_final_project/source_data/Chicago_Police_Department_-_Illinois_Uniform_Crime_Reporting_\(IUCR\)_Codes_20250928.csv
+
+#################################
+#RUFF
+
+ruff-check: ## Run ruff linter
+	ruff check .
+
+ruff-fix: ## Run ruff linter with auto-fix
+	ruff check . --fix

@@ -1,10 +1,10 @@
 import json
 import random
+import threading
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
-import threading
 from pathlib import Path
+from typing import Any
 
 import factory
 import pandas as pd
@@ -40,16 +40,15 @@ def load_iucr_codes_from_csv(
     try:
         df = None
 
-        # Try multiple possible locations for the CSV file
         possible_paths = [
-            csv_path,  # Direct path
-            Path(csv_path),  # As Path object
-            Path.cwd() / csv_path,  # Current directory
-            Path('data') / csv_path,  # data subdirectory
-            Path('source_data') / csv_path,  # source_data subdirectory
-            Path('..') / csv_path,  # Parent directory
-            Path('../data') / csv_path,  # Parent's data directory
-            Path('../source_data') / csv_path,  # Parent's source_data directory
+            csv_path,
+            Path(csv_path),
+            Path.cwd() / csv_path,
+            Path('data') / csv_path,
+            Path('source_data') / csv_path,
+            Path('..') / csv_path,
+            Path('../data') / csv_path,
+            Path('../source_data') / csv_path,
         ]
 
         for try_path in possible_paths:
@@ -63,7 +62,6 @@ def load_iucr_codes_from_csv(
             print(f"Searched paths: {[str(p) for p in possible_paths[:5]]}")
             return _get_fallback_iucr_mapping()
 
-        # Filter for active codes only
         if 'ACTIVE' in df.columns:
             active_df = df[df['ACTIVE'] == True].copy()
             print(f"Loaded {len(active_df)} active IUCR codes (filtered from {len(df)} total)")
@@ -71,23 +69,16 @@ def load_iucr_codes_from_csv(
             active_df = df.copy()
             print(f"Loaded {len(active_df)} IUCR codes (no ACTIVE column found)")
 
-        # Create mapping of IUCR -> PRIMARY DESCRIPTION
         iucr_mapping = {}
         for _, row in active_df.iterrows():
-            # Clean and normalize IUCR code
             iucr_code = str(row['IUCR']).strip()
-
-            # Some IUCR codes might have leading zeros stripped - try to preserve them
-            # But also handle numeric codes that need padding
             if iucr_code.isdigit() and len(iucr_code) <= 4:
-                # Keep as-is for now, don't pad
                 pass
 
             primary_desc = str(row['PRIMARY DESCRIPTION']).strip()
             iucr_mapping[iucr_code] = primary_desc
 
         print(f"Successfully created mapping with {len(iucr_mapping)} IUCR codes")
-        # Print first few codes as verification
         sample_codes = list(iucr_mapping.keys())[:5]
         print(f"Sample IUCR codes: {sample_codes}")
 
@@ -130,7 +121,6 @@ def _get_fallback_iucr_mapping() -> dict:
     }
 
 
-# Load IUCR codes from CSV at module import time
 IUCR_CODES_MAPPING = load_iucr_codes_from_csv()
 
 
@@ -146,7 +136,6 @@ def get_next_crime_id():
 def get_next_arrest_id():
     """Get next unique arrest ID (CB number)"""
     if not hasattr(_arrest_id_counter, 'value'):
-        # Start at a higher number to avoid conflicts with existing data
         _arrest_id_counter.value = 50000000
     with _counter_lock:
         _arrest_id_counter.value += 1
@@ -364,7 +353,7 @@ class CriminalJusticeProvider(BaseProvider):
     def block_address():
         """Generate block address"""
         block_num = random.randint(0, 9900)
-        block_num = (block_num // 100) * 100  # Round to nearest hundred
+        block_num = (block_num // 100) * 100
 
         streets = [
             "N MICHIGAN AVE", "S STATE ST", "W ADAMS ST", "E RANDOLPH ST",
@@ -431,7 +420,7 @@ class ArrestFactory(factory.Factory):
     class Meta:
         model = Arrest
 
-    cb_no = factory.Faker('cb_number')  # Now uses unique counter
+    cb_no = factory.Faker('cb_number')
     case_number = factory.Faker('case_number')
     arrest_date = factory.Faker('date_between', start_date='-2y', end_date='-1d')
     race = factory.Faker('random_element', elements=[r.value for r in Race])
@@ -462,7 +451,6 @@ class ArrestFactory(factory.Factory):
         num_charges = random.choices([1, 2, 3, 4], weights=[40, 35, 20, 5])[0]
         charges = [ChargeFactory() for _ in range(num_charges)]
 
-        # Assign charges to specific fields
         for i, charge in enumerate(charges, 1):
             if i <= 4:
                 setattr(self, f'charge_{i}_statute', charge.statute)
@@ -542,7 +530,6 @@ class CrimeFactory(factory.Factory):
             "INTIMIDATION": ["EDUCATIONAL INSTITUTION", "RESIDENTIAL", "AGGRAVATED"]
         }
 
-        # If the primary type has specific descriptions, use them
         type_descriptions = descriptions.get(self.primary_type, None)
 
         if type_descriptions:
@@ -688,11 +675,9 @@ class CriminalJusticeDataGenerator:
         print(f"Saved {len(records)} {data_type} records to {filename}")
 
 
-# Example usage
 if __name__ == "__main__":
     generator = CriminalJusticeDataGenerator()
 
-    # Generate sample data
     print("Generating 50 arrest records...")
     arrests = generator.generate_arrests(50)
 

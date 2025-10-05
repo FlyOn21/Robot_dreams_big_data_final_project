@@ -41,9 +41,9 @@ def create_spark_session() -> SparkSession:
         SparkSession.builder
         .appName("Bronze_Chicago_Crimes_Ingest")
         .config("spark.sql.shuffle.partitions", "200")
-        .config("spark.jars", SPARK_JARS)  # Removed f-string, not needed
-        .config("spark.driver.extraClassPath", SPARK_JARS)  # Add for reliability
-        .config("spark.executor.extraClassPath", SPARK_JARS)  # Add for reliability
+        .config("spark.jars", SPARK_JARS)
+        .config("spark.driver.extraClassPath", SPARK_JARS)
+        .config("spark.executor.extraClassPath", SPARK_JARS)
         .getOrCreate()
     )
 

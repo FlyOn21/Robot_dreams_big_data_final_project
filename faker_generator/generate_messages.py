@@ -228,13 +228,12 @@ class CriminalDataStreamer:
                     self.stats['arrests_generated'] += 1
                     self.stats['bytes_sent'] += len(json.dumps(arrest_dict))
 
-                # Log progress every 1000 records
                 total_records = self.stats['arrests_generated'] + self.stats['crimes_generated']
                 if total_records % 1000 == 0:
                     mb_sent = self.stats['bytes_sent'] / 1024 / 1024
                     logger.info(f"Streamed {total_records} records ({mb_sent:.1f} MB)")
 
-                time.sleep(0.3)  # Small delay to prevent overwhelming
+                time.sleep(0.3)
 
             producer.flush()
             producer.close()
@@ -349,7 +348,7 @@ def main():
 
     if args.correlated > 0:
         logger.info(f"Generating correlated dataset with {args.correlated} crimes")
-        arrest_file, crime_file = exporter.generate_correlated_dataset(
+        exporter.generate_correlated_dataset(
             total_crimes=args.correlated,
             format_type=args.format
         )
@@ -358,7 +357,7 @@ def main():
         arrest_count = args.arrests if args.arrests > 0 else 100
         crime_count = args.crimes if args.crimes > 0 else 100
 
-        arrest_file, crime_file = exporter.generate_sample_files(
+        exporter.generate_sample_files(
             arrest_count=arrest_count,
             crime_count=crime_count,
             format_type=args.format
@@ -366,7 +365,7 @@ def main():
 
     else:
         logger.info("No specific counts provided, generating default sample")
-        arrest_file, crime_file = exporter.generate_sample_files(
+        exporter.generate_sample_files(
             arrest_count=50,
             crime_count=100,
             format_type=args.format

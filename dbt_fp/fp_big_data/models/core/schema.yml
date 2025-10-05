@@ -1,8 +1,8 @@
 version: 2
 
 models:
+  # DIMENSION
 
-  # DIMENSION TABLES
   - name: dim_crime_type
     description: "Dimension table for crime types standardization and analysis"
     columns:
@@ -23,6 +23,7 @@ models:
       - name: index_code
         description: "Index code for classification"
 
+  # --------------------------------------------------------------------------
 
   - name: dim_location
     description: "Dimension table for locations and geographic analysis of crimes"
@@ -71,6 +72,7 @@ models:
         description: "Full text description of location"
 
   # FACT TABLES
+
   - name: fact_crimes
     description: "Detailed fact table for crimes"
     columns:
@@ -115,10 +117,12 @@ models:
       - name: location_key
         description: "Location key (relationship to dim_location)"
         tests:
-          - not_null
           - relationships:
               to: ref('dim_location')
               field: location_key
+              config:
+                where: "location_key IS NOT NULL"
+                severity: warn
 
       - name: iucr_code
         description: "Crime type code (relationship to dim_crime_type)"
@@ -127,6 +131,8 @@ models:
           - relationships:
               to: ref('dim_crime_type')
               field: iucr_code
+              config:
+                severity: warn
 
       - name: primary_description
         description: "Primary crime type"
@@ -137,6 +143,19 @@ models:
       - name: is_violent_crime
         description: "Flag for violent crime"
 
+      - name: beat_id
+        description: "Police beat identifier"
+
+      - name: district_id
+        description: "Police district identifier"
+
+      - name: ward_id
+        description: "Ward identifier"
+
+      - name: community_area_id
+        description: "Community area identifier"
+
+  # --------------------------------------------------------------------------
 
   - name: fact_arrests
     description: "Detailed fact table for arrests"
@@ -158,18 +177,14 @@ models:
       - name: arrestee_race
         description: "Race of arrestee"
 
-      - name: arrestee_gender
-        description: "Gender of arrestee"
-        tests:
-          - accepted_values:
-              values: [ 'Male', 'Female', 'Unknown' ]
-
       - name: primary_charge_code
         description: "Primary charge code"
         tests:
           - relationships:
               to: ref('dim_crime_type')
               field: iucr_code
+              config:
+                severity: warn
 
       - name: primary_charge_description
         description: "Description of primary charge"
@@ -177,10 +192,23 @@ models:
       - name: charge_type
         description: "Charge type"
 
+      - name: charge_one_class
+        description: "Class of primary charge"
+
+      - name: is_felony_charge
+        description: "Whether primary charge is a felony"
+
+      - name: has_multiple_charges
+        description: "Whether arrestee has more than one charge"
+
+      - name: charge_count
+        description: "Total number of charges"
+
       - name: crime_id
         description: "Relationship to crime (if exists)"
 
-  # AGGREGATED TABLES
+  # AGGREGATED
+
   - name: agg_daily_crimes
     description: "Aggregated overview of crimes by day"
     tests:

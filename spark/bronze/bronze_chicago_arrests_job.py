@@ -1,14 +1,13 @@
 import logging
 import os
-from glob import glob
 import traceback
+from glob import glob
 
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, concat_ws, current_timestamp, input_file_name, sha2
 from pyspark.sql.types import LongType, StringType, StructField, StructType
 
 from spark.bronze.bronze_utils.write_to_postgres import write_to_postgres_bronze
-
 
 ARRESTS_SCHEMA = StructType([
     StructField("cb_no", LongType(), True),
@@ -49,9 +48,9 @@ def create_spark_session() -> SparkSession:
         SparkSession.builder
         .appName("Bronze_Chicago_Arrests_Ingest")
         .config("spark.sql.shuffle.partitions", "200")
-        .config("spark.jars", SPARK_JARS)  # Removed f-string, not needed
-        .config("spark.driver.extraClassPath", SPARK_JARS)  # Add for reliability
-        .config("spark.executor.extraClassPath", SPARK_JARS)  # Add for reliability
+        .config("spark.jars", SPARK_JARS)
+        .config("spark.driver.extraClassPath", SPARK_JARS)
+        .config("spark.executor.extraClassPath", SPARK_JARS)
         .getOrCreate()
     )
 

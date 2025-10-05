@@ -87,36 +87,6 @@ with DAG(
         python_callable=validate_results
     )
 
-    # dbt_deps_silver = BashOperator(
-    #     task_id='dbt_deps_silver',
-    #     bash_command=r"""
-    #         set -e
-    #         cd /dbt_fp/fp_big_data
-    #         rm -rf /dbt_fp/fp_big_data/dbt_packages
-    #         echo "Installing dbt dependencies..."
-    #         dbt deps --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
-    #         """
-    # )
-    # dbt_run_silver = BashOperator(
-    #     task_id='dbt_run_silver',
-    #     bash_command=r"""
-    #         set -e
-    #         cd /dbt_fp/fp_big_data
-    #         echo "Running dbt models..."
-    #         dbt run --full-refresh --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
-    #         """
-    # )
-    #
-    # dbt_test_silver = BashOperator(
-    #     task_id='dbt_test_silver',
-    #     bash_command=r"""
-    #         set -e
-    #         cd /dbt_fp/fp_big_data
-    #         echo "Running dbt tests..."
-    #         dbt test --target dev --profiles-dir /home/airflow/.dbt --project-dir /dbt_fp/fp_big_data
-    #         """
-    # )
-
     crimes_silver = BashOperator(
         task_id="crimes_silver_job",
         bash_command=r"""
@@ -166,4 +136,4 @@ with DAG(
     jobs_silver = [crimes_silver, arrests_silver, ucr_code_silver]
 
     check_connect_data_task >> jobs_bronze >> point_wait_jobs_bronze >> validate_results_task >> jobs_silver >> point_wait_jobs_silver >> end
-    
+
