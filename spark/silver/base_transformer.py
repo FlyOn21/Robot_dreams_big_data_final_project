@@ -34,7 +34,6 @@ class SilverTransformer(ABC):
         self.pg_password = os.getenv("POSTGRES_PASSWORD", "12345678")
         self.jdbc_url = f"jdbc:postgresql://{self.pg_host}:{self.pg_port}/{self.pg_db}"
 
-        # Spark configuration
         self.spark_jars = os.getenv("SPARK_JARS", "/jars/postgresql-42.7.0.jar")
         self.shuffle_partitions = os.getenv("SPARK_SHUFFLE_PARTITIONS", "400")
 
@@ -45,7 +44,7 @@ class SilverTransformer(ABC):
         self.spark = (
             SparkSession.builder
             .appName(self.app_name)
-            .config("spark.driver.memory", "4g")  # Increase as needed
+            .config("spark.driver.memory", "4g")
             .config("spark.executor.memory", "4g")
             .config("spark.driver.maxResultSize", "2g")
             .config("spark.memory.fraction", "0.8")
@@ -128,7 +127,6 @@ class SilverTransformer(ABC):
             table_name: Name of the silver table
             mode: Write mode (overwrite, append, etc.)
         """
-        # Ensure silver schema exists
         self._ensure_schema_exists("silver")
 
         record_count = df.count()

@@ -57,13 +57,11 @@ class CrimesTransformer(SilverTransformer):
         """Convert columns to appropriate data types"""
         self.logger.info("Converting data types")
 
-        # Parse datetime - format: "MM/dd/yyyy hh:mm:ss a"
         df = df.withColumn(
             "crime_datetime",
             to_timestamp(col("crime_datetime_raw"), "MM/dd/yyyy hh:mm:ss a")
         )
 
-        # Convert numeric columns
         df = (df
               .withColumn("beat_id", col("beat_id").cast(IntegerType()))
               .withColumn("district_id", col("district_id").cast(IntegerType()))
@@ -102,13 +100,11 @@ class CrimesTransformer(SilverTransformer):
         """Add additional derived columns"""
         self.logger.info("Adding derived columns")
 
-        # Extract crime_date from crime_datetime
         df = df.withColumn(
             "crime_date",
             to_date(col("crime_datetime"))
         )
 
-        # Create location_full_text
         df = df.withColumn(
             "location_full_text",
             concat_ws(" - ", col("block"), col("location_description"))

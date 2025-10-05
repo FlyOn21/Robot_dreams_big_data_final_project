@@ -73,7 +73,6 @@ class ArrestsTransformer(SilverTransformer):
         """Convert columns to appropriate data types"""
         self.logger.info("Converting data types")
 
-        # Parse arrest_date - try multiple formats
         df = df.withColumn(
             "arrest_date",
             coalesce(

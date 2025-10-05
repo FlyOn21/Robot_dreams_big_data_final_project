@@ -60,7 +60,6 @@ class CrimeStreamProcessor:
         self.pg_user = pg_user
         self.pg_password = pg_password
 
-        # Clean temp directories
         self.temp_dir = tempfile.mkdtemp(prefix="spark_crime_stream_", dir="/tmp")
         logger.info(f"Using temporary directory: {self.temp_dir}")
 

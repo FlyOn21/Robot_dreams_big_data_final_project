@@ -13,7 +13,6 @@ class UCRCodesTransformer(SilverTransformer):
 
     def __init__(self):
         super().__init__(app_name="Silver_Chicago_UCR_Codes_Transform")
-        # Override shuffle partitions for smaller reference data
         self.shuffle_partitions = os.getenv("SPARK_SHUFFLE_PARTITIONS", "50")
 
     def get_bronze_table_name(self) -> str:
@@ -23,7 +22,6 @@ class UCRCodesTransformer(SilverTransformer):
         return "silver_ucr_codes"
 
     def get_write_mode(self) -> str:
-        # Reference data - overwrite mode
         return "overwrite"
 
     def select_and_rename_columns(self, df: DataFrame) -> DataFrame:
@@ -112,7 +110,7 @@ class UCRCodesTransformer(SilverTransformer):
 
         initial_count = df.count()
 
-        # For UCR codes, deduplicate by iucr_code (not hash_row)
+        #deduplicate by iucr_code (not hash_row)
         window_spec = Window.partitionBy("iucr_code").orderBy(desc("load_timestamp"))
 
         df = (
