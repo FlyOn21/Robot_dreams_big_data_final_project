@@ -1,0 +1,15 @@
+fp_big_data:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('POSTGRES_HOST', 'dbt_hw_fp_host') }}"
+      port: "{{ env_var('POSTGRES_PORT', '5432') | int }}"
+      user: "{{ env_var('POSTGRES_USER', 'dbt_user') }}"
+      password: "{{ env_var('POSTGRES_PASSWORD', '12345678') }}"
+      dbname: "{{ env_var('POSTGRES_DB', 'dbt_hw_fp') }}"
+      schema: staging
+      threads: 4
+      keepalives_idle: 0
+      connect_timeout: 10
+      search_path: "public,staging,silver"
